@@ -12,8 +12,11 @@ import org.jsoup.nodes.Document;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.UnsupportedAudioFileException;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -92,23 +95,28 @@ public class PollingScraper {
 												" is Available Now!\n\nGet the product now at the following url: " +
 												productUrl;
 
-								alertService.sendEmail(
-										patreonConfig.getToEmail(),
+								alertService.sendEmail(patreonConfig.getToEmail(),
 										productBeingMonitored.getTitle() + " is Available Now!",
 										alertMessage
 
 								);
-								alertService.sendText(
-										patreonConfig.getToPhoneNumber(),
+								alertService.sendText(patreonConfig.getToPhoneNumber(),
 										patreonConfig.getPhoneCarrier(),
 										alertMessage
 								);
-								alertService.playAlertSound();
+								try {
+									alertService.playAlertSound();
+								} catch (IOException | UnsupportedAudioFileException | LineUnavailableException e) {
+									log.error("An error occurred when attempting to play the alert sound!");
+								}
 
 								nextAlert = Instant.now()
 										.plus((long) patreonConfig.getTimeBetweenAlerts(), ChronoUnit.MINUTES);
 							} else {
-								log.debug("Alert successfully suppressed until: {}", nextAlert);
+								log.debug(
+										"Alert successfully suppressed until: {}",
+										nextAlert.atZone(ZoneId.systemDefault())
+								);
 							}
 							break;
 						} else {

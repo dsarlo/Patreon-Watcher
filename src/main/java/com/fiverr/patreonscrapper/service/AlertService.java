@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.sound.sampled.AudioInputStream;
@@ -20,9 +21,16 @@ public class AlertService implements IAlertService {
 
 	@Autowired private JavaMailSender javaMailSender;
 
+	/**
+	 * @param recipient
+	 * @param subject
+	 * @param body
+	 *
+	 * @throws MailException
+	 */
+	@Async
 	@Override
-	public boolean sendEmail(String recipient, String subject, String body) {
-		boolean emailSent = true;
+	public void sendEmail(String recipient, String subject, String body) {
 		SimpleMailMessage simpleMailMessage = new SimpleMailMessage();
 		simpleMailMessage.setTo(recipient);
 		simpleMailMessage.setText(body);
@@ -32,14 +40,20 @@ public class AlertService implements IAlertService {
 			javaMailSender.send(simpleMailMessage);
 		} catch (MailException e) {
 			log.error("A MailException occurred when attempting to send an alert: {}", simpleMailMessage, e);
-			emailSent = false;
+			throw e;
 		}
-
-		return emailSent;
 	}
 
+	/**
+	 * @param phoneNumber
+	 * @param carrier
+	 * @param body
+	 *
+	 * @throws MailException
+	 */
+	@Async
 	@Override
-	public boolean sendText(String phoneNumber, String carrier, String body) {
+	public void sendText(String phoneNumber, String carrier, String body) {
 		String carrierDomain = "@";
 		switch (carrier) {
 			case "Verizon":
@@ -56,11 +70,12 @@ public class AlertService implements IAlertService {
 				break;
 		}
 		String recipient = phoneNumber + carrierDomain;
-		return sendEmail(recipient, "", body);
+		sendEmail(recipient, "", body);
 	}
 
+	@Async
 	@Override
-	public boolean playAlertSound() {
+	public void playAlertSound() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
 		boolean audioPlayed = true;
 		try {
 			AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(getClass().getClassLoader()
@@ -70,9 +85,8 @@ public class AlertService implements IAlertService {
 			clip.loop(1);
 			clip.start();
 		} catch (IOException | UnsupportedAudioFileException | LineUnavailableException e) {
-			e.printStackTrace();
-			audioPlayed = false;
+			log.error("An IOException occurred when attempting to play the alert sound!");
+			throw e;
 		}
-		return true;
 	}
 }
